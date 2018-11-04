@@ -130,6 +130,12 @@ function log_dbg {
 	fi
 }
 
+# Log xtrace
+function log_xtr {
+	set +x
+	log_dbg -
+}
+
 
 function log_stepnew {
 	log_inf "STEP NEW ($_LOG_DEPTH): $@"
@@ -165,8 +171,8 @@ function log_cleanup {
 # Debugging logs (beware, will be async from other standard log_ calls !)
 #typeset -a LOG_DBGSTACK
 typeset LOG_DBGFILE="$LOG_BASE/svc.${APP_NAME}.$$.dbg"
-exec 99> >(log_dbg -; wait)
-export PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]}::$LINENO)  '
+exec 99> >(log_xtr; wait)
+export PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]:-main}::$LINENO)  '
 BASH_XTRACEFD=99
 
 
@@ -201,7 +207,7 @@ set -x
 			
 		# root... yay !
 		elif [[ "$curruser" = "root" ]]; then
-			cat | su  "$runas"
+			cat | su -m "$runas"
 			ret=$?
 		else
 			log_err "Cannot change from user $curruser to user $runas"
@@ -213,17 +219,20 @@ set -x
 
 		# No user specified, or already correct user
 		if [[ -z "$runas" ]] || [[ "$runas" = "$curruser" ]]; then
+			log_dbg "Using eval to run as '$runas' cmd: '$@'"
 			eval "$@"
 			ret=$?
 
 		# root... yay !
 		elif [[ "$curruser" = "root" ]]; then
+			log_dbg "Using su to run as '$runas' cmd: '$*'"
 			# I need to flatten
-			su -c "$*" - "$runas"
+			su -m -c "$*" "$runas"
 			ret=$?
 
 		# Maybe handle sudo ?
 		elif sret="$(sudo -nl 2>/dev/null|awk 'p==1; /may run the following commands/{p=1;}')" && [[ -n "$sret" ]]; then
+			log_dbg "Using sudo to run as '$runas' cmd: '$@'"
 			# maybe should parse $sret output more...
 			sudo -n -u "$runas" "$@"
 			ret=$?
