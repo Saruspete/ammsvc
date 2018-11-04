@@ -381,16 +381,18 @@ function amsvc_upgrade {
 # Parse global options
 function amsvc_parseopt {
 
-	case $1 in
-		-v|--verbose)
-			LOG_VERB+=1
-			shift
-			;;
+	while [[ -n "${1:-}" ]]; do
+		case $1 in
+			-v|--verbose)
+				LOG_VERB+=1
+				shift
+				;;
 
-		*)
-			break;
-			;;
-	esac
+			*)
+				break;
+				;;
+		esac
+	done
 }
 
 
