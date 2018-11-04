@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+typeset MYSELF="$(readlink -f $0)"
+typeset MYPATH="${MYSELF%/*}"
+typeset MYCALL="$0"
+
+# Source the lib
+. $MYPATH/../../amsvc.lib
+
+RUN_BIN="$RUN_BASE/bin/promdb"
+RUN_OPT="--config.file /dev/null"
+RUN_PIDOPT="--pidfile"
+
+amsvc_main "$@"

@@ -1,0 +1,19 @@
+#!/bin/bash
+
+while [[ -n "$@" ]]; do
+	opt=$1; shift
+
+	case "$opt" in
+		--pidfile)
+			echo $$ >| $1
+			shift
+			;;
+		--config.file)
+			echo "CFG File= $1"
+			shift
+			;;
+	esac
+
+done
+
+exit 0

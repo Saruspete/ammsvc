@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+typeset MYSELF="$(readlink -f $0)"
+typeset MYPATH="${MYSELF%/*}"
+typeset MYCALL="$0"
+
+# Source the lib
+. $MYPATH/../../amsvc.lib
+
+echo adrien > /dev/null
+set -x
+echo coucou > /dev/null
+date
+#set +x
+log_stepnew "Start of step 1"
+log_inf "hahahahah"
+
+log_stepnew "Start of step 1.1"
+log_inf "pouet ?"
+log_stepend "End of step 1.1"
+
+log_stepnew "Start of step 1.2"
+date >/dev/null
+log_err "$(log_stackdump)"
+log_stepend "End of step 1.2"
+
+log_stepend "End of step 1"
