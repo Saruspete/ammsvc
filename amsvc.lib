@@ -23,7 +23,7 @@ typeset -r APP_BASE="$(readlink -f $MYPATH/../apps/${APP_PACK})"
 typeset -r DAT_BASE="$(readlink -f $MYPATH/../data/${APP_PACK})"
 typeset -r SRC_BASE="$(readlink -f $MYPATH/../srcs/${APP_NAME})"
 typeset -r TMP_BASE="$(readlink -f $MYPATH/../temp/${APP_NAME})"
-typeset -r TMP_PIDS="${TMP_BASE}/_pids"
+typeset -r TMP_PIDS="${TMP_BASE}/pids"
 typeset -r LOG_BASE="${DAT_BASE}/logs"
 
 # Sanity checks
@@ -38,11 +38,10 @@ typeset -r LOG_BASE="${DAT_BASE}/logs"
 
 
 #
-typeset RUN_VERS="current"
+typeset RUN_VERS="${RUN_VERS:-current}"
 typeset RUN_BASE="$APP_BASE/${APP_NAME}-${RUN_VERS}"
-typeset DB_STORE="$DAT_BASE/${APP_NAME}"
 
-export RUN_VERS RUN_BASE LOG_BASE DB_STORE
+export RUN_VERS RUN_BASE DAT_BASE SRC_BASE TMP_BASE LOG_BASE
 
 # To be overriden by script
 typeset RUN_USER="${RUN_USER:-}"
