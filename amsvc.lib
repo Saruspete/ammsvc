@@ -45,10 +45,11 @@ typeset DB_STORE="$DAT_BASE/${APP_NAME}"
 export RUN_VERS RUN_BASE LOG_BASE DB_STORE
 
 # To be overriden by script
-typeset RUN_BIN="${RUN_BIN:-}"
-typeset RUN_OPT="${RUN_OPT:-}"
 typeset RUN_USER="${RUN_USER:-}"
-typeset RUN_PIDOPT="${RUN_PIDOPT:-}"
+typeset RUN_BIN="${RUN_BIN:-}"
+typeset RUN_OPTSTART="${RUN_OPTSTART:-}"
+typeset RUN_OPTSTOP="${RUN_OPTSTOP:-}"
+typeset RUN_OPTPID="${RUN_OPTPID:-}"
 typeset RUN_DAEMON=""
 
 # Verbosity
@@ -173,8 +174,8 @@ BASH_XTRACEFD=99
 function normalize_linereturn {
 	typeset file="$1"
 
-	grep -Pv '^\s*#' "$file" \
 	# Inspired from https://www.linuxquestions.org/questions/programming-9/merge-lines-in-a-file-using-sed-191121/
+	grep -Pv '^\s*#' "$file" \
 	| sed -e :a -e N -Ee 's/\\\s*(#.*)?\n^\s*/ /' -e ta
 }
 
@@ -254,7 +255,7 @@ function user_owner {
 function amsvc_start {
 
 	# Use global opts if available
-	typeset opts="${RUN_OPT:-}"
+	typeset opts="${RUN_OPTSTART:-}"
 	typeset pidf=""
 
 	# If argument provided, use these to override
@@ -283,9 +284,9 @@ function amsvc_start {
 		#
 		# PIDFILE management
 		#
-		[[ -n "$RUN_PIDOPT" ]] && {
+		[[ -n "$RUN_OPTPID" ]] && {
 			pidf="$(amsvc_getpidfile)"
-			opts+=" $RUN_PIDOPT $pidf"
+			opts+=" $RUN_OPTPID $pidf"
 		}
 
 		# If pidfile, check it has access to the file
@@ -373,14 +374,31 @@ function amsvc_isrunning {
 	return 1
 }
 
+function amsvc_upgrade {
+	:
+}
+
 # Parse global options
 function amsvc_parseopt {
-	:
+
+	case $1 in
+		-v|--verbose)
+			LOG_VERB+=1
+			shift
+			;;
+
+		*)
+			break;
+			;;
+	esac
 }
 
 
 # Main processing option
 function amsvc_main {
+
+	# First parse common options
+	amsvc_parseopt "$@"
 
 	act="${1:-}"; shift
 
@@ -404,8 +422,7 @@ function amsvc_main {
 			;;
 
 		upgrade)
-			[[ -z "$1" ]] 
-			echo "
+			amsvc_upgrade "$@"
 			;;
 		*)
 			log_err "Usage: $0 <start|stop|restart|status|zap>"
