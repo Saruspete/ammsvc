@@ -175,7 +175,7 @@ function log_cleanup {
 # Debugging logs (beware, will be async from other standard log_ calls !)
 #typeset -a LOG_DBGSTACK
 typeset LOG_DBGFILE="$LOG_BASE/svc.${APP_NAME}.$$.dbg"
-exec 98>&1 99> >(log_xtr; wait)
+exec 98>&1 99> >(log_xtr)
 export PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]:-main}::$LINENO)  '
 BASH_XTRACEFD=99
 
