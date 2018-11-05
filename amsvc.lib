@@ -97,9 +97,9 @@ function log {
 			# Skip the ending "set +x" of dbg
 			[[ $line =~ .+\ set\ \+x$ ]] && continue
 			if [[ -t 1 ]]; then
-				echo -e "[$(date "$datefmt")][$lvlcol]$pad $line"
+				echo >&98 -e "[$(date "$datefmt")][$lvlcol]$pad $line"
 			else
-				echo "[$(date "$datefmt")][$lvl]$pad $line"
+				echo >&98 "[$(date "$datefmt")][$lvl]$pad $line"
 			fi
 		done
 
@@ -107,9 +107,9 @@ function log {
 	else
 		# Use color & short date if stdout (1) is pure tty (not piped)
 		if [[ -t 1 ]]; then
-			echo -e "[$(date "$datefmt")][$lvlcol]$pad $@"
+			echo >&98 -e "[$(date "$datefmt")][$lvlcol]$pad $@"
 		else
-			echo "[$(date "$datefmt")][$lvl]$pad $@"
+			echo >&98 "[$(date "$datefmt")][$lvl]$pad $@"
 		fi
 	fi
 }
@@ -175,7 +175,7 @@ function log_cleanup {
 # Debugging logs (beware, will be async from other standard log_ calls !)
 #typeset -a LOG_DBGSTACK
 typeset LOG_DBGFILE="$LOG_BASE/svc.${APP_NAME}.$$.dbg"
-exec 99> >(log_xtr; wait)
+exec 98>&1 99> >(log_xtr; wait)
 export PS4=' (${BASH_SOURCE##*/}::${FUNCNAME[0]:-main}::$LINENO)  '
 BASH_XTRACEFD=99
 
@@ -390,8 +390,8 @@ function amsvc_upgrade {
 	:
 }
 
-# Parse global options
-function amsvc_parseopt {
+# Main processing option
+function amsvc_main {
 
 	while [[ -n "${1:-}" ]]; do
 		case $1 in
@@ -405,14 +405,6 @@ function amsvc_parseopt {
 				;;
 		esac
 	done
-}
-
-
-# Main processing option
-function amsvc_main {
-
-	# First parse common options
-	amsvc_parseopt "$@"
 
 	act="${1:-}"; shift
 
