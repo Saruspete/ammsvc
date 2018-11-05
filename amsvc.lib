@@ -20,9 +20,9 @@ unset LD_LIBRARY_PATH
 typeset -r APP_NAME="${MYCALL##*/}"
 typeset -r APP_PACK="${APP_NAME%%-*}"
 typeset -r APP_BASE="$(readlink -f $MYPATH/../apps/${APP_PACK})"
-typeset -r DAT_BASE="$(readlink -f $MYPATH/../data/${APP_PACK})"
-typeset -r SRC_BASE="$(readlink -f $MYPATH/../srcs/${APP_NAME})"
-typeset -r TMP_BASE="$(readlink -f $MYPATH/../temp/${APP_NAME})"
+typeset -r DAT_BASE="$(readlink -f $MYPATH/../data/${APP_PACK}/${APP_NAME})"
+typeset -r SRC_BASE="$(readlink -f $MYPATH/../srcs/${APP_PACK}/${APP_NAME})"
+typeset -r TMP_BASE="$(readlink -f $MYPATH/../temp/${APP_PACK}/${APP_NAME})"
 typeset -r TMP_PIDS="${TMP_BASE}/pids"
 typeset -r LOG_BASE="${DAT_BASE}/logs"
 
@@ -86,6 +86,10 @@ function log {
 	typeset pad="$(char_repeat $(($_LOG_DEPTH*2)))"
 	[[ "$lvl" == "DBG" ]] && pad=""
 
+	# If stdin (0) is a tty, just use shortdate
+	typeset datefmt='+%H:%M:%S'
+	[[ -t 0 ]] || datefmt='+%Y-%m-%d_%H:%M:%S'
+
 	# Read stdin
 	if [[ "$1" = "-"  ]]; then
 
@@ -93,9 +97,9 @@ function log {
 			# Skip the ending "set +x" of dbg
 			[[ $line =~ .+\ set\ \+x$ ]] && continue
 			if [[ -t 1 ]]; then
-				echo -e "[$(date '+%H:%M:%S')][$lvlcol]$pad $line"
+				echo -e "[$(date "$datefmt")][$lvlcol]$pad $line"
 			else
-				echo "[$(date '+%Y-%m-%d_%H:%M:%S')][$lvl]$pad $line"
+				echo "[$(date "$datefmt")][$lvl]$pad $line"
 			fi
 		done
 
@@ -103,9 +107,9 @@ function log {
 	else
 		# Use color & short date if stdout (1) is pure tty (not piped)
 		if [[ -t 1 ]]; then
-			echo -e "[$(date '+%H:%M:%S')][$lvlcol]$pad $@"
+			echo -e "[$(date "$datefmt")][$lvlcol]$pad $@"
 		else
-			echo "[$(date '+%Y-%m-%d_%H:%M:%S')][$lvl]$pad $@"
+			echo "[$(date "$datefmt")][$lvl]$pad $@"
 		fi
 	fi
 }
