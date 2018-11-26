@@ -19,12 +19,28 @@ unset LD_LIBRARY_PATH
 # Set my path according to these
 typeset -r APP_NAME="${MYCALL##*/}"
 typeset -r APP_PACK="${APP_NAME%%-*}"
-typeset -r APP_BASE="$(readlink -f $MYPATH/../apps/${APP_PACK})"
-typeset -r DAT_BASE="$(readlink -f $MYPATH/../data/${APP_PACK}/${APP_NAME})"
-typeset -r SRC_BASE="$(readlink -f $MYPATH/../srcs/${APP_PACK}/${APP_NAME})"
-typeset -r TMP_BASE="$(readlink -f $MYPATH/../temp/${APP_PACK}/${APP_NAME})"
+typeset    APP_BASE="$$MYPATH/../apps/${APP_PACK})"
+typeset    DAT_BASE="$$MYPATH/../data/${APP_PACK}/${APP_NAME}"
+typeset    SRC_BASE="$$MYPATH/../srcs/${APP_PACK}/${APP_NAME}"
+typeset    TMP_BASE="$$MYPATH/../temp/${APP_PACK}/${APP_NAME}"
+
+# Create folders, they may be used by update procedures
+for p in "$APP_BASE" "$DAT_BASE" "$SRC_BASE" "$TMP_BASE"; do
+	[[ -d "$p" ]] || mkdir -p "$p"
+done
+
+# Clean the paths for absolute value
+typeset -r APP_BASE="$(readlink -f $APP_BASE)"
+typeset -r DAT_BASE="$(readlink -f $DAT_BASE)"
+typeset -r SRC_BASE="$(readlink -f $SRC_BASE)"
+typeset -r TMP_BASE="$(readlink -f $TMP_BASE)"
 typeset -r TMP_PIDS="${TMP_BASE}/pids"
 typeset -r LOG_BASE="${DAT_BASE}/logs"
+
+# Create folders, they may be used by update procedures
+for p in "$TMP_PIDS" "$LOG_BASE"; do
+	[[ -d "$p" ]] || mkdir -p "$p"
+done
 
 # Sanity checks
 [[ -z "$APP_BASE" ]] && { echo >&2 "Unable to find APP_BASE value"; exit 1; }
@@ -32,6 +48,7 @@ typeset -r LOG_BASE="${DAT_BASE}/logs"
 [[ -z "$DAT_BASE" ]] && { echo >&2 "Unable to find DAT_BASE value"; exit 1; }
 [[ -z "$TMP_BASE" ]] && { echo >&2 "Unable to find TMP_BASE value"; exit 1; }
 [[ -e "$APP_BASE" ]] || { echo >&2 "Missing required folder '$APP_BASE'"; exit 1; }
+
 [[ -d "$TMP_BASE" ]] || mkdir -p "$TMP_BASE"
 [[ -d "$LOG_BASE" ]] || mkdir -p "$LOG_BASE"
 
@@ -46,6 +63,7 @@ export RUN_VERS RUN_BASE DAT_BASE SRC_BASE TMP_BASE LOG_BASE
 # To be overriden by script
 typeset RUN_USER="${RUN_USER:-}"
 typeset RUN_BIN="${RUN_BIN:-}"
+typeset RUN_CFG="${RUN_CFG:-}"
 typeset RUN_OPTSTART="${RUN_OPTSTART:-}"
 typeset RUN_OPTSTOP="${RUN_OPTSTOP:-}"
 typeset RUN_OPTPID="${RUN_OPTPID:-}"
@@ -134,7 +152,7 @@ function log_dbg {
 	fi
 }
 
-# Log xtrace
+# Log xtrace (run in another process)
 function log_xtr {
 	set +x
 	log_dbg -
@@ -321,7 +339,7 @@ function amsvc_start {
 			opts+=" >>$logfile 2>&1 0>/dev/null &"
 		}
 
-		log_inf "Starting with \$RUN_BIN var ($RUN_BIN)"
+		log_inf "Starting with \$RUN_BIN var ($RUN_BIN $opts)"
 		typeset out=""
 		typeset ret=""
 
