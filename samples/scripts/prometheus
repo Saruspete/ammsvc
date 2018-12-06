@@ -1,0 +1,91 @@
+#!/bin/bash
+
+set -o nounset
+set -o noclobber
+
+typeset -r MYSELF="$(readlink -f $0)"
+typeset -r MYPATH="${MYSELF%/*}"
+typeset -r MYCALL="$0"
+
+# Load the lib. Will define variables to be used in this script:
+# Example: this script is in /home/myuser/services/scripts/myapp-db
+# APP_NAME = myapp-db
+# APP_PACK = myapp
+# APP_BASE = /home/myuser/services/apps/myapp
+# DAT_BASE = /home/myuser/services/data/myapp/myapp-db
+# SRC_BASE = /home/myuser/services/srcs/myapp/myapp-db
+# TMP_BASE = /home/myuser/services/temp/myapp/myapp-db
+# ## Constructed from $TMP_BASE and $DAT_BASE
+# TMP_PIDS = /home/myuser/services/temp/myapp/myapp-db/pids
+# LOG_BASE = /home/myuser/services/data/myapp/myapp-db/logs
+
+# You can specify the app version to be used by changing RUN_VERS.
+# By default, RUN_VERS="current", and you need to define it before loading the lib
+# RUN_VERS = current
+# RUN_BASE = "$APP_BASE/${APP_NAME}-${RUN_VERS}
+#          = /home/myuser/services/apps/myapp/myapp-db-current
+. $MYPATH/amsvc.lib
+
+# Now, you can use some variables and leverage 'amsvc_main "$@"'
+# The following "RUN_" vars are used by amsvc_start/stop/status
+
+RUN_BIN="$RUN_BASE/prometheus"
+RUN_CFG="$RUN_BASE/prometheus.yml"
+#RUN_OPTCFG="--config.file"
+#RUN_OPTPID="--pidfile"
+RUN_OPTSTART="--config.file=$RUN_CFG --storage.tsdb.path=$DAT_BASE --storage.tsdb.retention=15d"
+#RUN_OPTSTOP=""
+#RUN_USER="myuser"
+RUN_DAEMON="1"
+UPG_GITHUBPRJ="prometheus/prometheus"
+
+# #### Upgrade procedures
+function upgrade_getlatest {
+
+	vers="$(fetch_github_latest "$UPG_GITHUBPRJ")"
+	# remove the prefix "v"
+	vers="${vers##v}"
+	[[ -z "$vers" ]] && {
+		log_err "Unable to fetch latest version of $UPG_GITHUBPRJ from github"
+		return 1
+	}
+
+	echo "$vers"
+}
+
+
+function upgrade_prepare {
+	typeset vers="$1"
+
+	[[ -z "$vers" ]] && {
+		log_err "Cannot call upgrade_prepare without target version"
+		return 1
+	}
+
+	typeset url="https://github.com/$UPG_GITHUBPRJ/releases/download/v${vers}/prometheus-${vers}.linux-amd64.tar.gz"
+
+	typeset out=""
+	typeset -i ret=1
+	out="$(app_deploy "$vers" "$url")"
+	ret=$?
+
+	[[ $ret -ne 0 ]] && {
+		log_err "Unable to deploy Prometheus (ret:$ret out:$out)"
+		return 1
+	}
+
+	# Test if we have our executable
+	[[ -x "$out/prometheus" ]] || {
+		log_err "Unable to find prometheus executable on folder '$out'"
+		return 1
+	}
+
+	return 0
+}
+# upgrade_confdiff "$VERSION1" "$VERSION2"
+# upgrade_confmerge "$VERSION1" "$VERSION2"
+# upgrade_test "$VERSION"
+
+
+# Call our lib main function
+amsvc_main "$@"

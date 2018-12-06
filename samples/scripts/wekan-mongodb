@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+set -o nounset
+set -o noclobber
+set -o errexit
+
+typeset MYSELF="$(readlink -f $0)"
+typeset MYPATH="${MYSELF%/*}"
+typeset MYCALL="$0"
+
+source "$MYPATH/lib/amsvc.lib"
+
+# Load env
+. /opt/rh/rh-mongodb34/enable
+export PATH CPATH LIBRARY_PATH LD_LIBRARY_PATH \
+		MANPATH JAVACONFDIRS XDG_CONFIG_DIRS XDG_DATA_DIRS \
+		PKG_CONFIG_PATH PYTHONPATH GOPATH
+
+CFG_FILE="$DAT_BASE/conf/mongod.conf"
+
+RUN_USER="ciara01"
+RUN_BIN="/opt/rh/rh-mongodb34/root/usr/bin/mongod"
+
+# Options for binary
+RUN_OPTPID="--pidfilepath"
+RUN_OPTSTART="--smallfiles --oplogSize 128 --config='$CFG_FILE'" # --noscripting --notablescan "
+RUN_OPTSTOP="--shutdown"
+
+function upgrade_prepare {
+
+	# https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-rhel70-4.0.3.tgz
+	:
+}
+
+
+amsvc_main "$@"
+

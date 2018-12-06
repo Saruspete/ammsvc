@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+
+set -o nounset
+set -o noclobber
+set -o errexit
+
+typeset MYSELF="$(readlink -f $0)"
+typeset MYPATH="${MYSELF%/*}"
+typeset MYCALL="$0"
+
+source "$MYPATH/lib/amsvc.lib"
+
+
+RUN_USER="ciara01"
+RUN_BIN="$RUN_BASE/node/bin/node"
+RUN_OPTSTART="$RUN_BASE/wekan/main.js"
+RUN_DAEMON="yes"
+
+# Vars for application
+export ROOT_URL="https://extranet.ciarapelab.com/tasks"
+export PORT=3002
+export MONGO_URL="mongodb://127.0.0.1:27018/wekan"
+#export MAIL_URL="smtp://user:pass@mailserver.example.com:25"
+#export MAIL_FROM="Ciara PE Lab Extranet <wekan@ciarapelab.com>"
+#export WITH_API="true"
+export BROWSER_POLICY_ENABLED="true"
+export WEBHOOKS_ATTRIBUTES=""
+#export METEOR_SETTINGS="$(cat $DIR_EXEC/settings.json)
+
+
+function upgrade_envfromdocker {
+	file="$1"
+	# Would have come better with awk
+	normalize_linereturn "$file" \
+	| grep ^ENV \
+	| cut -d " " -f 2-
+}
+
+function upgrade_prepare {
+	typeset vers="$1"
+
+	# Equivalent to the dockerfile:
+	# /home/wekan/app  = $src/wekan
+	# /home/wekan/app_build = $src/wekan_build
+	# /build = $dst
+	typeset src="$SRC_BASE/wekan-${vers}"
+	typeset dst="$APP_BASE/wekan-${vers}"
+
+	export HOME="$dst"
+
+	# Cleanup
+	rm -fr "$src" "$dst"
+
+	# Prepare build dir
+	mkdir -p "$src" "$src/wekan"
+
+	# Download and extract wekan
+	log_stepnew "Downloading Wekan ($vers)"
+	cd "$src/wekan"
+	wget "https://github.com/wekan/wekan/archive/v${vers}.tar.gz" -O "wekan-${vers}.tar.gz"
+	log_inf "Unpacking wekan-${vers}.tar.gz in $(pwd -P)"
+	tar xf "wekan-${vers}.tar.gz" --strip-components=1
+
+	# This will extract the environment variables from Dockerfile
+	log_inf "Exporting environment values from Dockerfile"
+	eval "export $(upgrade_envfromdocker "Dockerfile")"
+
+	log_stepend "Wekan downloaded"
+
+	#
+	# node
+	#
+	log_stepnew "Downloading Node-${NODE_VERSION}"
+
+	if [[ -d "$dst/node" ]]; then
+		log_inf "Node folder already in '$dst/node'. Skipping (delete the folder to redownload it)"
+	else
+
+		cd "$dst"
+		wget "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-${ARCHITECTURE}.tar.gz"
+		wget "https://nodejs.org/dist/${NODE_VERSION}/SHASUMS256.txt.asc"
+		grep "${NODE_VERSION}-${ARCHITECTURE}.tar.gz" "SHASUMS256.txt.asc" | shasum -a 256 -c -
+		tar xzf "node-${NODE_VERSION}-${ARCHITECTURE}.tar.gz"
+		rm "node-${NODE_VERSION}-${ARCHITECTURE}.tar.gz"
+		mv "node-${NODE_VERSION}-${ARCHITECTURE}" "$dst/node"
+	fi
+
+	# To use packaged node & npm
+	export PATH="$dst/node/bin:$PATH"
+
+	log_inf "Installing for user $USER npm@${NPM_VERSION} node-gyp fibers@${FIBERS_VERSION}"
+	npm install npm@${NPM_VERSION}
+	npm install node-gyp
+	npm install fibers@${FIBERS_VERSION}
+
+	log_stepend "Node installed and prepared in '$dst/node'"
+
+	#
+	# Meteor
+	#
+	log_stepnew "Downloading Meteor"
+
+	cd "$src"
+	if [[ -e "$HOME/.meteor" ]]; then
+		log_wrn "Meteor already installed in $HOME/.meteor"
+		log_wrn "To reinstall, remove this folder and retry"
+	else
+		log_inf "Installing meteor"
+		curl "https://install.meteor.com/install.sh" | sh
+	fi
+
+	log_inf "Downloading additionnal packages"
+	mkdir -p "$src/wekan/packages"
+	cd "$src/wekan/packages"
+	[[ -d "kadira-flow-router" ]] ||  git clone --depth 1 -b master git://github.com/wekan/flow-router.git kadira-flow-router
+	[[ -d "meteor-useraccounts-core" ]] || {
+		git clone --depth 1 -b master git://github.com/meteor-useraccounts/core.git meteor-useraccounts-core
+		sed -i 's/api\.versionsFrom/\/\/api.versionsFrom/' meteor-useraccounts-core/package.js
+	}
+	[[ -d "meteor-accounts-cas" ]] || git clone --depth 1 -b master git://github.com/wekan/meteor-accounts-cas.git
+	[[ -d "wekan-ldap" ]] || git clone --depth 1 -b master git://github.com/wekan/wekan-ldap.git
+
+
+	#cd "$HOME/.meteor"
+	#./meteor -- help
+	export PATH="$HOME/.meteor:$PATH"
+	log_stepend "Meteor installed in $HOME/.meteor"
+
+
+	#
+	# Build app
+	#
+	log_stepnew "Building Wekan from '$src/wekan'"
+	cd "$src/wekan"
+	mkdir -p "$src/app_build"
+	log_inf "Adding standard-minifier package"
+	meteor add standard-minifier-js
+
+	log_inf "Installing packages"
+	meteor npm install
+
+	log_inf "Build application in '$src/app_build'"
+	meteor build --directory "$src/app_build"
+
+	log_inf "Patching"
+	cp -f "fix-download-unicode/cfs_access-point.txt" "$src/app_build/bundle/programs/server/packages/cfs_access-point.js"
+
+	log_inf "Installing packages for server"
+	cd "$src/app_build/bundle/programs/server"
+	npm install
+
+	# Move to destination
+	log_inf "Moving built '$src/app_build/bundle' to '$dst/wekan'"
+	mv "$src/app_build/bundle" "$dst/wekan"
+
+	log_stepend "App built"
+}
+
+
+
+
+amsvc_main "$@"
+
