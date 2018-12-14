@@ -376,22 +376,39 @@ function app_getpath {
 function app_deploy {
 	typeset vers="$1"
 	typeset url="$2"
+	typeset bincheck="${3:-}"
 
 	# Prepare the target path
-	typeset dst="$(app_getpath "$vers")/${url##*/}"
-	mkdir -p "${dst%/*}"
+	typeset dstdir="$(app_getpath "$vers")"
+	typeset dst="$dstdir/${url##*/}"
+	mkdir -p "$dstdir"
 
 	# Fetch the file from url (if needed)
 	if ! [[ -s "$dst" ]]; then
 		log_dbg "Fetching url '$url' @ '$vers' to '$dst'"
 		fetch_auto "$url" "$dst"
+		ret=$?
+
+		if [[ $ret -ne 0 ]]; then
+			log_err "Unable to download url '$url' to '$dst'"
+			return 1
+		fi
 	else
 		log_inf "Using existing file '$dst'"
 	fi
 
 	# Unpack the file
-	app_unpack "$vers" "$dst"
+	app_unpack "$vers" "$dst" | log_dbg "-"
 
+	echo "$dstdir"
+
+	# If a bin to be checked is provided
+	if [[ -n "$bincheck" ]] && ! [[ -x "$dstdir/$bincheck" ]]; then
+		log_err "Unable to find '$bincheck' executable in folder '$dstdit'"
+		return 1
+	fi
+
+	return 0
 }
 
 function app_unpack {
@@ -682,7 +699,7 @@ function amsvc_upgrade {
 		r=$?
 		log_err "Upgrade_prepare failed. ReturnCode: $r"
 	}
-	log_stepend
+	log_stepend "Finished app preparation. Ret:$r"
 	[[ $r -ne 0 ]] && return $r
 
 	# Display the configuration difference
@@ -690,28 +707,32 @@ function amsvc_upgrade {
 	if is_func upgrade_confdiff; then
 		upgrade_confdiff "$version_new" "$version_old"
 		r=$?
+		log_stepend "Diff done. Ret:$r"
+	else
+		log_stepend "No function 'upgrade_confdiff' declared. Skipping"
 	fi
-	log_stepend
 
 	# Try to setup the new config file
 	log_stepnew "Upgrade: merging configuration files"
 	if is_func upgrade_confmerge; then
 		upgrade_confmerge "$version_new" "$version_old"
 		r=$?
+		log_stepend "Merge done. Ret:$r"
+	else
+		log_stepend "No function 'upgrade_confmerge' declared. Skipping"
 	fi
-	log_stepend
 
 	# Test the new version
 	log_stepnew "Upgrade: Testing new version"
 	if is_func upgrade_test; then
 		upgrade_test "$version_new"
 		r=$?
+		log_stepend "test done. Ret:$r"
+	else
+		log_stepend "No function 'upgrade_test' declared. Skipping"
 	fi
-	log_stepend
 
-
-
-	log_stepend
+	log_stepend "Upgrade finished. Final result: $r"
 	return $r
 }
 
@@ -810,7 +831,7 @@ function amsvc_main {
 			r=$?
 			;;
 		*)
-			log_err "Usage: $0 <start|stop|restart|status|zap>"
+			log_err "Usage: $0 <start|stop|restart|status|upgrade>"
 			exit 1
 			;;
 	esac
