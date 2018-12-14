@@ -1,0 +1,56 @@
+#!/bin/bash
+
+set -o nounset
+set -o noclobber
+
+typeset -r MYSELF="$(readlink -f $0)"
+typeset -r MYPATH="${MYSELF%/*}"
+typeset -r MYCALL="$0"
+
+# Load the lib. Will define variables to be used in this script:
+# Example: this script is in /home/myuser/services/scripts/myapp-db
+# APP_NAME = myapp-db
+# APP_PACK = myapp
+# APP_BASE = /home/myuser/services/apps/myapp
+# DAT_BASE = /home/myuser/services/data/myapp/myapp-db
+# SRC_BASE = /home/myuser/services/srcs/myapp/myapp-db
+# TMP_BASE = /home/myuser/services/temp/myapp/myapp-db
+# ## Constructed from $TMP_BASE and $DAT_BASE
+# TMP_PIDS = /home/myuser/services/temp/myapp/myapp-db/pids
+# LOG_BASE = /home/myuser/services/data/myapp/myapp-db/logs
+
+# You can specify the app version to be used by changing RUN_VERS.
+# By default, RUN_VERS="current", and you need to define it before loading the lib
+# RUN_VERS = current
+# RUN_BASE = "$APP_BASE/${APP_NAME}-${RUN_VERS}
+#          = /home/myuser/services/apps/myapp/myapp-db-current
+. $MYPATH/amsvc.lib
+
+# Now, you can use some variables and leverage 'amsvc_main "$@"'
+# The following "RUN_" vars are used by amsvc_start/stop/status
+
+# Binary to be called
+RUN_BIN="$RUN_BASE/myapp.bin"
+# Options to be passed to this executable (avoid specifying pidfile)
+#RUN_OPTSTART=""
+#RUN_OPTSTOP=""
+# If your app supports writing its PID in a file, specify the option here
+#RUN_OPTPID="--pidfile"
+# By default, the binary will be run as its owner. Override it with RUN_USER:
+#RUN_USER="myuser"
+# If your app stays in foreground, we can daemonize it
+#RUN_DAEMON="1"
+
+# If your startup sequence is too complex, define a "run_start" function
+
+
+
+# #### Upgrade procedures
+# upgrade_prepare "$VERSION_NEW"
+# upgrade_confdiff "$VERSION_NEW" "$VERSION_OLD"
+# upgrade_confmerge "$VERSION_NEW" "$VERSION_OLD"
+# upgrade_test "$VERSION_NEW"
+
+
+# Call our lib main function
+amsvc_main "$@"
