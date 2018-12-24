@@ -240,6 +240,12 @@ function is_binary {
 	return 0
 }
 
+function file_diff {
+	typeset f1="$1"
+	typeset f2="$2"
+
+	diff -y --suppress-common-lines "$f1" "$f2"
+}
 
 ##############################################################################
 #
@@ -355,7 +361,7 @@ function fetch_auto {
 		log_err "Unable to process url '$src'"
 		ret=99
 	fi
-	
+
 	echo "$dst"
 	return $ret
 }
@@ -404,7 +410,7 @@ function app_deploy {
 
 	# If a bin to be checked is provided
 	if [[ -n "$bincheck" ]] && ! [[ -x "$dstdir/$bincheck" ]]; then
-		log_err "Unable to find '$bincheck' executable in folder '$dstdit'"
+		log_err "Unable to find '$bincheck' executable in folder '$dstdir'"
 		return 1
 	fi
 
@@ -441,10 +447,15 @@ function app_unpack {
 			typeset strip=" --strip-components=1"
 			while read line; do
 				# If no transformation is done, we have one or more folder at root level.
+				# Folders always ends with "/", even "./"
 				[[ "${line##*/}" == "$line" ]] && {
 					log_wrn "One or more file found at root archive. Not stripping first level"
 					strip=""
 					break
+				}
+				# If the tarball starts with "./", we need to strip it too
+				[[ "${line}" =~ ^\./ ]] && {
+					strip=" --strip-components=2"
 				}
 			done < <(\tar $TAR_OPTS -t -f "$src")
 
