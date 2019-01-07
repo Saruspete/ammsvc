@@ -262,7 +262,7 @@ function fetch_github_latest {
 	# wget will show the redirect url
 	typeset vers="$(echo "$out"| grep -Po 'releases/tag/.+[" ]' | cut -d/ -f 3 | tr -d '"')"
 	echo "$vers"
-	[[ -z "$vers" ]]
+	[[ -n "$vers" ]]
 }
 
 function fetch_http {
