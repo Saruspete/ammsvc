@@ -253,10 +253,27 @@ function file_diff {
 #
 ##############################################################################
 
-function fetch_github_latest {
+function fetch_github_branch {
 	typeset projectpath="$1"
+	typeset branch="${2:-master}"
 
-	typeset url="https://github.com/$projectpath/releases/latest"
+	# Get the atom feed, and grep the related tag...
+	typeset url="https://github.com/$projectpath/commits/${branch}.atom"
+	typeset out="$(fetch_http "$url" "-")"
+	typeset commitid="${out#*<id>tag:github.com,2008:Grit::Commit/}"
+	commitid="${commitid%%</id>*}"
+	typeset commitdate="${out#*<updated>}"
+	commitdate="${commitdate%%</updated>*}"
+
+	echo "$commitdate $commitid"
+	[[ -n "$commitdate" ]]
+}
+
+function fetch_github_release {
+	typeset projectpath="$1"
+	typeset tag="${2:-latest}"
+
+	typeset url="https://github.com/$projectpath/releases/$tag"
 	typeset out="$(fetch_http "$url" "-" "nofollow")"
 	# curl will output the html with new location href
 	# wget will show the redirect url
