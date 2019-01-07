@@ -437,8 +437,10 @@ function app_deploy {
 		log_inf "Using existing file '$dst'"
 	fi
 
-	# Unpack the file
-	app_unpack "$vers" "$dst" | log_dbg "-"
+	# Unpack the file (if one)
+	[[ -f "$dst" ]] && {
+		app_unpack "$vers" "$dst" | log_dbg "-"
+	}
 
 	echo "$dstdir"
 
