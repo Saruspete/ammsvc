@@ -247,6 +247,16 @@ function file_diff {
 	diff -y --suppress-common-lines "$f1" "$f2"
 }
 
+function file_replace {
+	typeset file="$1"
+	typeset search="$2"
+	typeset replace="$3"
+
+	sed -Ee "s~$search~$replace~" -i "$file"
+}
+
+
+
 ##############################################################################
 #
 # Fetching data
