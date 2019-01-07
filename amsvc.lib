@@ -350,8 +350,23 @@ function fetch_auto {
 	typeset opt="${3:-}"
 	typeset ret=0
 
+
+	# git: URL ends with .git  or start as git://
+	if [[ $src =~ ^git:// ]] || [[ $src =~ .+\.git$ ]]; then
+		if is_binary "git"; then
+			(
+				mkdir -p "$dst"
+				cd "$dst"
+				git clone "$src" .
+			)
+			ret=$?
+		else
+			log_err "Cannot find git"
+			ret=99
+		fi
+
 	# scp: host:path
-	if [[ $src =~ ^[a-zA-Z0-9_\-\.]+:.+$ ]]; then
+	elif [[ $src =~ ^[a-zA-Z0-9_\-\.]+:.+$ ]]; then
 		log_wrn "scp not yet implemented"
 		ret=99
 
@@ -359,6 +374,7 @@ function fetch_auto {
 	elif [[ $src =~ ^rsync:// ]]; then
 		if is_binary "rsync"; then
 			rsync -a "$src" "$dst"
+			ret=$?
 		else
 			log_err "Cannot find rsync"
 			ret=99
@@ -374,6 +390,7 @@ function fetch_auto {
 	elif [[ -e "$(readlink -f $src)" ]]; then
 		log_inf "Fetching '$src' with cp"
 		cp -r "$src" "$dst"
+		ret=$?
 	else
 		log_err "Unable to process url '$src'"
 		ret=99
