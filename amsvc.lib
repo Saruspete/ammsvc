@@ -470,11 +470,29 @@ function app_unpack {
 	typeset file="${src##*/}"
 	typeset path="${src%/*}"
 	typeset user="${RUN_USER:-$(user_owner "$MYSELF")}"
+	typeset usercurr="$(user_current)"
 	typeset -i ret=0
 
 	typeset PREP_BIN=""
 	typeset PREP_OPTS=""
+	typeset TAR_BIN="\\tar"
 	typeset TAR_OPTS=" -C $path "
+
+	# if we need to change the ownership
+	if [[ "$user" != "$usercurr" ]]; then
+
+		# tar as root can change its owner
+		if [[ "$usercurr" = "root" ]]; then
+			TAR_OPTS+=" --owner=$user "
+		# prefix tar with sudo to run as root
+		elif is_binary "sudo" >/dev/null; then
+			TAR_BIN="\\sudo -n \\tar"
+			TAR_OPTS+=" --owner=$user "
+		else
+			log_err "Cannot change the ownership from $usercurr to $user"
+			return 1
+		fi
+	fi
 
 	# Preprocessing if needed (could use -a)
 	case $file in
