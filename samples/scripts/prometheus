@@ -43,6 +43,8 @@ UPG_GITHUBPRJ="prometheus/prometheus"
 function upgrade_getlatest {
 
 	vers="$(fetch_github_latest "$UPG_GITHUBPRJ")"
+	typeset vers="$(fetch_github_release "$UPG_GITHUBPRJ")"
+
 	# remove the prefix "v"
 	vers="${vers##v}"
 	[[ -z "$vers" ]] && {
