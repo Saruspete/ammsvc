@@ -36,6 +36,7 @@ typeset -r SRC_BASE="$(readlink -f $SRC_BASE)"
 typeset -r TMP_BASE="$(readlink -f $TMP_BASE)"
 typeset -r TMP_PIDS="${TMP_BASE}/pids"
 typeset -r LOG_BASE="${DAT_BASE}/logs"
+typeset -r CFG_BASE="${DAT_BASE}/conf"
 
 # Create folders, they may be used by update procedures
 for p in "$TMP_PIDS" "$LOG_BASE"; do
@@ -49,8 +50,10 @@ done
 [[ -z "$TMP_BASE" ]] && { echo >&2 "Unable to find TMP_BASE value"; exit 1; }
 [[ -e "$APP_BASE" ]] || { echo >&2 "Missing required folder '$APP_BASE'"; exit 1; }
 
+# TODO: This should be "runas"
 [[ -d "$TMP_BASE" ]] || mkdir -p "$TMP_BASE"
 [[ -d "$LOG_BASE" ]] || mkdir -p "$LOG_BASE"
+[[ -d "$CFG_BASE" ]] || mkdir -p "$CFG_BASE"
 
 
 
@@ -777,34 +780,52 @@ function amsvc_upgrade {
 	log_stepend "Finished app preparation. Ret:$r"
 	[[ $r -ne 0 ]] && return $r
 
-	# Display the configuration difference
-	log_stepnew "Upgrade: getting differences between config files"
+	# Generate the new configuration if needed
+	if is_func upgrade_confgen; then
+		log_stepnew "Upgrade: generating configuration file if needed"
+		upgrade_confgen "$version_new"
+		r=$?
+
+		log_stepend "Generation done. Ret:$r"
+	fi
+
+	# Display the configuration difference (user acceptance)
+	typeset cfgmergeok=false
 	if is_func upgrade_confdiff; then
+		log_stepnew "Upgrade: getting differences between config files"
 		upgrade_confdiff "$version_new" "$version_old"
 		r=$?
+
+		# if return was not ok
+		if [[ $r -ne 0 ]]; then
+			# Ask user to check / change conf before
+			:
+		else
+			cfgmergeok=$r
+		fi
 		log_stepend "Diff done. Ret:$r"
 	else
-		log_stepend "No function 'upgrade_confdiff' declared. Skipping"
+		log_inf "No function 'upgrade_confdiff' declared. Skipping"
 	fi
 
 	# Try to setup the new config file
-	log_stepnew "Upgrade: merging configuration files"
 	if is_func upgrade_confmerge; then
+		log_stepnew "Upgrade: merging configuration files"
 		upgrade_confmerge "$version_new" "$version_old"
 		r=$?
 		log_stepend "Merge done. Ret:$r"
 	else
-		log_stepend "No function 'upgrade_confmerge' declared. Skipping"
+		log_wrn "No function 'upgrade_confmerge' declared. Skipping"
 	fi
 
 	# Test the new version
-	log_stepnew "Upgrade: Testing new version"
 	if is_func upgrade_test; then
+		log_stepnew "Upgrade: Testing new version"
 		upgrade_test "$version_new"
 		r=$?
 		log_stepend "test done. Ret:$r"
 	else
-		log_stepend "No function 'upgrade_test' declared. Skipping"
+		log_wrn "No function 'upgrade_test' declared. Skipping"
 	fi
 
 	log_stepend "Upgrade finished. Final result: $r"
