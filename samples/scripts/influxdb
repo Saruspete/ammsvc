@@ -30,10 +30,10 @@ typeset -r MYCALL="$0"
 # The following "RUN_" vars are used by amsvc_start/stop/status
 
 RUN_BIN="$RUN_BASE/usr/bin/influxd"
-RUN_CFG="$RUN_BASE/etc/influxdb/influxdb.conf"
-#RUN_OPTCFG="--config.file"
-#RUN_OPTPID="--pidfile"
-#RUN_OPTSTART=""
+RUN_CFG="$CFG_BASE/amsvc.conf"
+#RUN_OPTCFG="-config"
+RUN_OPTPID="-pidfile"
+RUN_OPTSTART="run -config $RUN_CFG"
 #RUN_OPTSTOP=""
 #RUN_USER="myuser"
 RUN_DAEMON="1"
@@ -53,7 +53,44 @@ function upgrade_prepare {
 	typeset url="https://dl.influxdata.com/influxdb/releases/influxdb-${vers}_linux_amd64.tar.gz"
 	app_deploy "$vers" "$url" "usr/bin/influxd"
 }
-# upgrade_confdiff "$VERSION1" "$VERSION2"
+
+function upgrade_confgen {
+	[[ -e "$RUN_CFG" ]] && {
+		log_inf "Configuration file '$RUN_CFG' already exists. Skipping"
+		return 0
+	}
+
+	# Generate default file
+	cat <<-EOT >> "$RUN_CFG"
+	[meta]
+	  dir = "$DAT_BASE/meta"
+
+	[data]
+	  # Stores the TSM files
+	  dir = "$DAT_BASE/data"
+	  # Stores the WAL files
+	  wal-dir = "$DAT_BASE/wal"
+	EOT
+}
+
+function upgrade_confdiff {
+	typeset versnew="$1"
+	typeset versold="$2"
+
+	typeset pathold="$(app_getpath "$versold")"
+	typeset pathnew="$(app_getpath "$versnew")"
+
+	[[ -d "$pathold" ]] || {
+		log_inf "Old version is not present. Skipping"
+		return 0
+	}
+
+	# Fetch the config with old config
+	typeset confold="$($pathold/usr/bin/influxd config -config $RUN_CFG)"
+	typeset confnew="$($pathnew/usr/bin/influxd config -config $RUN_CFG)"
+
+	file_diff <(echo "$confold") <(echo "$confnew")
+}
 # upgrade_confmerge "$VERSION1" "$VERSION2"
 # upgrade_test "$VERSION"
 
