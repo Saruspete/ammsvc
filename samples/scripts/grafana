@@ -29,11 +29,11 @@ typeset -r MYCALL="$0"
 # Now, you can use some variables and leverage 'amsvc_main "$@"'
 # The following "RUN_" vars are used by amsvc_start/stop/status
 
-RUN_BIN="$RUN_BASE/grafana"
-RUN_CFG="$RUN_BASE/grafana.ini"
+RUN_BIN="$RUN_BASE/bin/grafana-server"
+RUN_CFG="$RUN_BASE/conf/amsvc.ini"
 #RUN_OPTCFG="--config.file"
-#RUN_OPTPID="--pidfile"
-RUN_OPTSTART="--config.file=$RUN_CFG --storage.tsdb.path=$DAT_BASE --storage.tsdb.retention=15d"
+RUN_OPTPID="-pidfile"
+RUN_OPTSTART="-config=$RUN_CFG -homepath=$RUN_BASE "
 #RUN_OPTSTOP=""
 #RUN_USER="myuser"
 RUN_DAEMON="1"
