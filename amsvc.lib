@@ -805,7 +805,7 @@ function amsvc_upgrade {
 		fi
 		log_stepend "Diff done. Ret:$r"
 	else
-		log_inf "No function 'upgrade_confdiff' declared. Skipping"
+		log_wrn "No function 'upgrade_confdiff' declared. Skipping"
 	fi
 
 	# Try to setup the new config file
