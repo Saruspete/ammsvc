@@ -703,11 +703,11 @@ function amsvc_start {
 			opts+=" >>$logfile 2>&1 0>/dev/null &"
 		}
 
-		log_inf "Starting with \$RUN_BIN var ($RUN_BIN $opts)"
+		log_inf "Starting with \$RUN_BIN var ($RUN_BIN $opts) as $runas"
 		typeset out=""
 		typeset ret=""
 
-		out="$(user_run "$RUN_USER" "$RUN_BIN" $opts 2>&1)"
+		out="$(user_run "$runas" "$RUN_BIN" $opts 2>&1)"
 		ret=$?
 
 
