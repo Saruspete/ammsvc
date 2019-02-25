@@ -258,6 +258,36 @@ function file_replace {
 	sed -Ee "s~$search~$replace~" -i "$file"
 }
 
+function file_cfg_set {
+	typeset file="$1"
+	typeset key="$2"
+	typeset val="${3:-}"
+
+	typeset valcurr=""
+	valcurr="$(file_cfg_get "$file" "$key")"
+
+	# No match found: just append it
+	if [[ $? -ne 0 ]]; then
+		echo "$key=$val" >> "$file"
+
+	# Edit the key value
+	else
+		sed -i "$file" -Ee 's#^(\s*'$key'\s*)[$=].*$#\1='$val'#g'
+	fi
+}
+
+function file_cfg_get {
+	typeset file="$1"
+	typeset key="$2"
+
+	typeset v=""
+	v="$(grep -P '^\s*'$key'\s*[=$].*$' "$file")"
+	[[ $? -ne 0 ]] && return 1
+
+	echo "${v#*=}"
+}
+
+
 
 
 ##############################################################################
