@@ -1,0 +1,62 @@
+#!/bin/bash
+
+typeset -r MYSELF="$(readlink -e "$0" || realpath "$0")"
+typeset -r MYPATH="${MYSELF%/*}"
+
+# APP_NAME = myapp-db
+# APP_PACK = myapp
+# APP_BASE = /home/myuser/services/apps/myapp
+# DAT_BASE = /home/myuser/services/data/myapp/myapp-db
+# SRC_BASE = /home/myuser/services/srcs/myapp/myapp-db
+# TMP_BASE = /home/myuser/services/temp/myapp/myapp-db
+# ## Constructed from $TMP_BASE and $DAT_BASE
+# TMP_PIDS = /home/myuser/services/temp/myapp/myapp-db/pids
+# LOG_BASE = /home/myuser/services/data/myapp/myapp-db/logs
+
+# You can specify the app version to be used by changing RUN_VERS.
+# By default, RUN_VERS="current", and you need to define it before loading the lib
+# RUN_VERS = current
+# RUN_BASE = "$APP_BASE/${APP_NAME}-${RUN_VERS}
+#          = /home/myuser/services/apps/myapp/myapp-db-current
+
+. $MYPATH/_common.lib || {
+	echo >&2 "Error during loading of '$MYPATH/_common.lib'. Please check"
+	exit 99
+}
+
+#ammApp::Init
+
+#
+# Global start/stop related vars
+#
+
+# These variables are relative to the rundir
+RUN_BIN="bin/grafana-server"
+RUN_CFG="conf/amsvc.ini"
+RUN_OPTPID="-pidfile "
+RUN_OPTSTART="-config=$RUN_CFG -homepath=$RUN_WORKDIR "
+RUN_DAEMON="1"
+
+
+#
+# Upgrade stubs
+#
+
+function appUpgradeGetLatest {
+
+	typeset rgx="dl.grafana.com/oss/release/grafana-[0-9\.\-]+\.linux-amd64\.tar\.gz"
+	typeset url="https://grafana.com/grafana/download"
+
+	ammHttp::Get "$url" "-" | grep -Po "$rgx"| head -n1
+}
+
+function appUpgradeGetUrls {
+	typeset vers="$1"
+
+	echo "https://dl.grafana.com/oss/release/grafana-$vers.linux-amd64.tar.gz"
+}
+
+ammOptparse::Parse --no-unknown || ammLog::Die "Parsing error"
+
+# Call our lib main function
+ammApp::Main "$@"

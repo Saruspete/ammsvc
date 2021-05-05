@@ -1,0 +1,67 @@
+# vim: ft=sh
+
+# #############################################################################
+# Common application library
+# #############################################################################
+#
+#
+# Multiple environment variables will be provided to your script:
+#
+# == To be overriden the following vars must be set before calling ammApp::Init:
+# - RUN_USER   (The user to run the script as) Defaults to the owner of the script
+# - RUN_VERS   (The version to run with) Defaults to "current"
+# RUN_BASE = "$APP_BASE/${APP_NAME}-${RUN_VERS}
+#          = /home/myuser/services/apps/appgrp/appgrp-db-current
+#
+#
+# == Once ammApp::Init has been called, many variables will be available
+#    Example: this script is in /home/myuser/services/scripts/appgrp-db
+# APP_NAME = appgrp-db
+# APP_PACK = appgrp
+# APP_BASE = /home/myuser/services/apps/appgrp
+# DAT_BASE = /home/myuser/services/data/appgrp/appgrp-db
+# SRC_BASE = /home/myuser/services/srcs/appgrp/appgrp-db
+# TMP_BASE = /home/myuser/services/temp/appgrp/appgrp-db
+# TMP_PIDS = $TMP_BASE/appgrp/appgrp-db/pids
+# LOG_BASE = $DAT_BASE/appgrp/appgrp-db/logs
+
+
+
+
+# Load main library
+typeset -a ammpaths=("$MYPATH/../lib/ammlib" "$HOME/.ammlib" "/etc/ammlib")
+for ammpath in "${ammpaths[@]}" fail; do
+	[[ -e "$ammpath/ammlib" ]] && source "$ammpath/ammlib" && break
+done
+if [[ "$ammpath" == "fail" ]]; then
+	echo >&2 "Unable to find ammlib in paths '${ammpaths[@]}'"
+	echo >&2 "Download it with 'git clone https://github.com/Saruspete/ammlib.git ${ammpaths[0]}'"
+	exit 1
+fi
+
+ammLib::Load "app" "optparse"
+
+#typeset RUN_ROOT=""
+typeset RUN_VERS="${RUN_VERS:-current}"
+
+ammOptparse::AddOptGroup "appconfig" "Global Configuration"
+ammOptparse::AddOpt "--runtime-version=" "Set the version to run"        "$RUN_VERS"
+#ammOptparse::AddOpt "--runtime-root="    "Override root path"            ""
+ammOptparse::AddOpt "--upgrade-version=" "Set the version to upgrade to"
+ammOptparse::AddOpt "--upgrade-list!"    "List available versions"
+#ammOptparse::AddOpt "--config="          "Load config from file"       ""
+#ammOptparse::AddOpt "--save="            "Save current state as file"
+
+#ammOptparse::AddOptGroup "app"
+
+# Non-fatal parsing for script-defined variables
+ammOptparse::Parse --no-help
+
+
+typeset RUN_VERS="$(ammOptparse::Get "runtime-version")"
+typeset UPG_VERS="$(ammOptparse::Get "upgrade-version")"
+typeset UPG_LIST="$(ammOptparse::Get "upgrade-list")"
+
+
+# Initialize the global variables
+ammApp::Init
