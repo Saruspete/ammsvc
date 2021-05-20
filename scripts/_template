@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+
+# Our real path
+typeset MYSELF="$(realpath $0)"
+typeset MYPATH="${MYSELF%/*}"
+
+# Source _common.lib to load ammlib & have global variables
+if ! source "$MYPATH/_common.lib"; then
+	echo >&2 "Error during loading of '$MYPATH/_common.lib'. Please check"
+	exit 99
+fi
+
+# =============================================================================
+# Environment initialization
+# =============================================================================
+
+# app.lib will extract some variables from the script name:
+# Consider a script we provide named "vendor-product", and we want to use it
+# within the "monitoring" group, we'll symlink it as "monitoring-product00":
+#   /ammlib/services/scripts/vendor-product
+#   /prod01/scripts/monitoring-product00 -> /ammlib/services/scripts/vendor-product
+
+#   APP_ROOT = Root folder where the library will place all its folders. (/prod01)
+#   APP_INST = Instance: Filename used to call the script (monitoring-product00)
+#   APP_NAME = App Name: Product name of the instance (product00)
+#   APP_GRPN = Group 
+#   APP_SDIR = Script dir: Parent folder of the script calling (/prod01/scripts)
+#   APP_PACK = Name of the 'pack', the first part of '-' in APP_NAME (monitoring)
+
+# ammApp::Init generates (readonly) variables and folders in parent dir (<root>)
+# /                            APP_ROOT
+# /apps/monitoring/product00   APP_BASE
+# /data/monitoring/product00   DAT_BASE
+#   /logs                      LOG_BASE
+#   /conf                      CFG_BASE
+# /srcs/monitoring/product00   SRC_BASE
+# /temp/monitoring/product00   TMP_BASE
+#   /pids                      TMP_PIDS
+
+# 2 Variables are used here:
+# RUN_USER:    To change the target user that should run the process. Defaults
+#              to the owner of the script
+# RUN_WORKDIR: The working directory
+
+ammApp::Init || ammLog::Die "Unable to initialize app environment"
+
+
+# #############################################################################
+# Main startup and runtime definition
+# #############################################################################
+
+# Some special variables are available to define the general service behaviour
+#RUN_BIN=""   # The binary to call (relative to $APP_BASE or absolute)
+#RUN_LIB=""   # Library path to be added to LD_LIBRARY_PATH
+#RUN_CFG=""   # The configuration file (relative to $CFG_BASE or absolute)
+
+# Dependencies management (for runtime and upgrade snapshot)
+#RUN_REQUIRES=
+
+# Warning: the options does not add space after, so you can use the format you want
+#RUN_OPTCOMMON="" # 
+#RUN_OPTSTART=""  # Bin options to start the binary
+#RUN_OPTSTOP=""   # Bin options to stop the binary
+#RUN_OPTPID=""    # Bin option to define the PID path to be used
+
+#RUN_DAEMON=""    # Should the script put the binary in daemon mode itself
+#RUN_WORKDIR=""   # The working directory to change to. Default=$DAT_BASE
+#RUN_VERS=""  # The version to use. Will be called as $APP_BASE/${APP_NAME}/${APP_VERS}
+              # Special value "current" will use a symlink to the latest available version
+
+
+# If the following functions are defined, the main function will use them to
+# do the related action instead of usual standard actions with $RUN_ vars
+#function appRun::Start { :; }
+#function appRun::Stop { :; }
+#function appRun::Status { :; }
+#function appRun::Restart { :; }
+#function appRun::Reload { :; }
+#function appRun::IsRunning { :; }
+
+# #############################################################################
+# Extra actions (non-standard start/stop/status....)
+# #############################################################################
+
+# Every extra function must be prefixed by "appRun::" + the name of the action
+#function appRun::cli { :; }
+#function appRun::index { :; }
+
+
+# #############################################################################
+# Deployment and upgrade related
+# #############################################################################
+
+# Used to check github for versions/releases + download
+#typeset UPG_GHPROJECT="user_or_org/repo_name"
+#typeset UPG_GHDEVALLOWED="false"
+#typeset UPG_GHDEVBRANCH="master"
+
+# UPG_DATAPOLICY defined how snapshot
+#typeset UPG_SNAPSHOTPOLICY="stop+copy+start"
+#typeset UPG_SNAPSHOTPOLICY="filesystem"
+#typeset UPG_DATAPOLICY="none"
+
+
+# Step0: Returns the latest available version, to compare with installed ones
+#function appUpgrade::GetLatest { :; }
+#function appUpgrade::GetVersions { :; }
+
+# Step1: Returns one or more URLs to download a given version
+#function appUpgrade::GetUrls {
+#	typeset version="$1"
+#} 
+
+# Step2: prepare the content (compile, arch extracting, edition...)
+#function appUpgrade::Prepare {
+#	typeset versionNew="$1"
+#	typeset versionOld="$2"
+#	typeset tempFolder="$3"
+#}
+
+# Step3: deploy required files into target app folder
+#function appUpgrade::Deploy {
+#	typeset versionNew="$1"
+#	typeset versionOld="$2"
+#	typeset appFolder="$3"
+#}
+
+# Step4: generate a new configuration file
+#function appUpgrade::Configure {
+#	typeset versionNew="$1"
+#	typeset versionOld="$2"
+#	typeset appFolder="$3"
+#}
+
+# Step5: test if the new version is working (in a new namespace)
+#function appUpgrade::Test {
+#	typeset versionNew="$1"
+#	typeset versionOld="$2"
+#}
+
+# Step6: Test the binary in standalone environment (chroot + net + fs)
+#function appUpgrade::Test {
+#	typeset versionNew="$1"
+#	typeset versionOld="$2"
+#}
+
+
+# #############################################################################
+# Final modifications to allow override and call the main job processing
+# #############################################################################
+
+#ammOptparse::AddOptGroup "myapp" "My App configuration override"
+#ammOptparse::AddOpt "--myapp-bin="  "Path to myapp, absolute or relative to 'APP_DIR/$RUN_VERS'" "$RUN_BIN"
+#ammOptparse::AddOpt "--myapp-cfg="  "Path to myapp config, absolute or relative to 'CFG_DIR/$RUN_VERS'" "$RUN_CFG"
+
+# Parse remaining / added options (or --help)
+ammOptparse::Parse || ammLog::Die "Parsing error"
+
+
+eval set -- $(ammOptparse::GetUnparsedOpts)
+ammApp::Main "$@"
+
