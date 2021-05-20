@@ -26,10 +26,12 @@
 # LOG_BASE = $DAT_BASE/appgrp/appgrp-db/logs
 
 
+typeset -r LIBSELFREAL="$(realpath ${BASH_SOURCE})"
+typeset -r LIBPATHREAL="${LIBSELFREAL%/*}"
 
 
 # Load main library
-typeset -a ammpaths=("$MYPATH/../lib/ammlib" "$HOME/.ammlib" "/etc/ammlib")
+typeset -a ammpaths=("$LIBPATHREAL/../lib/ammlib" "$HOME/.ammlib" "/etc/ammlib")
 for ammpath in "${ammpaths[@]}" fail; do
 	[[ -e "$ammpath/ammlib" ]] && source "$ammpath/ammlib" && break
 done
@@ -45,14 +47,21 @@ ammLib::Load "app" "optparse"
 typeset RUN_VERS="${RUN_VERS:-current}"
 
 ammOptparse::AddOptGroup "appconfig" "Global Configuration"
-ammOptparse::AddOpt "--runtime-version=" "Set the version to run"        "$RUN_VERS"
-#ammOptparse::AddOpt "--runtime-root="    "Override root path"            ""
-ammOptparse::AddOpt "--upgrade-version=" "Set the version to upgrade to"
-ammOptparse::AddOpt "--upgrade-list!"    "List available versions"
+ammOptparse::AddOpt "--runtime-root="    "Override the root dir"
+ammOptparse::AddOpt "--runtime-version=" "Override the version to run"      "$RUN_VERS"
+ammOptparse::AddOpt "--runtime-cwd="     "Override work-dir"                ""
 #ammOptparse::AddOpt "--config="          "Load config from file"       ""
 #ammOptparse::AddOpt "--save="            "Save current state as file"
 
+ammOptparse::AddOptGroup "appupgrade" "Upgrade configuration (for action 'upgrade')"
+ammOptparse::AddOpt "--upgrade-version=" "Set the version to upgrade to"
+ammOptparse::AddOpt "--upgrade-list!"    "List available versions"
+
+
 #ammOptparse::AddOptGroup "app"
+
+# Just skip default action words, handled by main
+#ammOptparse::AddActionWord "continue" "start" "stop" "restart"
 
 # Non-fatal parsing for script-defined variables
 ammOptparse::Parse --no-help
@@ -64,4 +73,4 @@ typeset UPG_LIST="$(ammOptparse::Get "upgrade-list")"
 
 
 # Initialize the global variables
-ammApp::Init
+ammApp::Init || ammLog::Die "Unable to initialize app environment"
