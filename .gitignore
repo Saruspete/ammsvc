@@ -1,4 +1,4 @@
-samples/apps/
-samples/data/
-samples/srcs/
-samples/temp/
+apps/
+data/
+srcs/
+temp/
