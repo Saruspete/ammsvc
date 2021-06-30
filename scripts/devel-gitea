@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+
+# Our real path
+typeset MYSELF="$(realpath "$0")"
+typeset MYPATH="${MYSELF%/*}"
+
+# Source _common.lib to load ammlib & have global variables
+if ! source "$MYPATH/_common.lib"; then
+	echo >&2 "Error during loading of '$MYPATH/_common.lib'. Please check"
+	exit 99
+fi
+
+
+# #############################################################################
+# Main startup and runtime
+# #############################################################################
+
+RUN_BIN="gitea"
+RUN_CFG="custom/conf/app.ini"
+
+RUN_OPTCOMMON="--work-path $RUN_WORKDIR"
+RUN_OPTSTART="web"    # Bin options to start the binary
+#RUN_OPTSTOP=""        # Bin options to stop the binary
+RUN_OPTPID="--pid "   # Bin option to define the PID path to be used
+RUN_OPTCFG="--config "
+RUN_DAEMON="true"     # Should the script put the binary in daemon mode itself
+
+typeset CFG_TEMPLATE="https://raw.githubusercontent.com/go-gitea/gitea/main/custom/conf/app.example.ini"
+
+ammOptparse::AddOptGroup "gitea" "Gitea configuration"
+ammOptparse::AddOpt "--gitea-bin="  "Path to gitea, absolute or relative to '$APP_BASE/$RUN_VERS'" "$RUN_BIN"
+ammOptparse::AddOpt "--gitea-cfg="  "Path to gitea config, absolute or relative to '$APP_BASE/$RUN_VERS'" "$RUN_CFG"
+ammOptparse::AddOpt "--gitea-cfg-tpl="  "URL to gitea configuration template" "$CFG_TEMPLATE"
+
+ammOptparse::Parse || ammLog::Die "Parsing error"
+eval set -- $(ammOptparse::GetUnparsedOpts)
+
+RUN_BIN="$(ammOptparse::Get "gitea-bin")"
+RUN_CFG="$(ammOptparse::Get "gitea-cfg")"
+CFG_TEMPLATE="$(ammOptparse::Get "gitea-cfg-tpl")"
+
+# #############################################################################
+# Extra features (non-standard start/stop/status....)
+# #############################################################################
+
+# Every function must be prefixed by "appRun"
+#function appRun::Cli {
+#	:
+#}
+
+#function appRun::Index {
+#	:
+#}
+
+function appRun::admin {
+	$RUN_BIN $RUN_OPTCOMMON admin "$@"
+}
+
+
+# #############################################################################
+# Deployment and upgrade related
+# #############################################################################
+
+# We usually specify some global variables here to be used through the script
+typeset UPG_GHPROJECT="go-gitea/gitea"
+
+# Returns one or more URLs to download a given version
+function appUpgrade::GetUrls {
+	typeset version="$1"
+
+	typeset url="https://github.com/$UPG_GHPROJECT/releases/download/$version/"
+	typeset arch=""
+	case $(uname -m) in
+		x86_64)    arch="amd64" ;;
+		i*86)      arch="i386" ;;
+		armv[67]*) arch="arm-6" ;;
+		armv8*)    arch="arm64" ;;
+	esac
+
+	if [[ -z "$arch" ]]; then
+		ammLog::Error "Unsupported architecture: '$(uname -m)'"
+		return 1
+	fi
+
+	url+="gitea-${version#v}-linux-${arch}"
+
+	# If we can uncompress it, try compressed version
+	ammExec::Exists xz && url+=".xz"
+
+	echo "$url"
+}
+
+
+# Optionnal: This is to prepare the archive, if more than extracting it is needed
+function appUpgrade::Prepare {
+	typeset versionNew="$1"
+	typeset versionOld="$2"
+	typeset tempFolder="$3"
+
+	typeset arch="$(appUpgrade::GetUrls $versionNew)"
+	arch="${arch##*/}"
+	typeset file="$tempFolder/source/$arch"
+	if ! [[ -s "$file" ]]; then
+		ammLog::Error "Unable to find file '$file'"
+		return 1
+	fi
+
+	if [[ "$file" != "${file%.xz}" ]]; then
+		xz --decompress "$file"
+		file="${file%.xz}"
+	fi
+
+	mv "$file" "$tempFolder/extract/gitea"
+	chmod +x "$tempFolder/extract/gitea"
+}
+
+# Optionnal: This will generate a new configuration file
+function appUpgrade::Configure {
+	typeset versionNew="$1"
+	typeset versionOld="$2"
+	typeset appFolder="$3"
+
+	# Copy the old configuration if existing
+	typeset oldcfg="$(ammApp::GetCfgPath "$versionOld")"
+	typeset newcfg="$appFolder/custom/conf/app.ini"
+	if ! [[ -d "${newcfg%/*}" ]]; then
+		if ! mkdir -p "${newcfg%/*}"; then
+			ammLog::Error "Cannot create parent folder for '$newcfg'"
+			return 1
+		fi
+	fi
+
+	# Use previous config is existing
+	if [[ -s "$oldcfg" ]]; then
+		ammLog::Info "Copying previous-version '$oldcfg' to '$appFolder'"
+		cp "$oldcfg" "$appFolder"
+		return $?
+	fi
+
+	# Generate a new file, from official template
+	#typeset template="https://raw.githubusercontent.com/go-gitea/gitea/main/custom/conf/app.example.ini"
+	typeset template="$CFG_TEMPLATE"
+	if ! ammHttp::FetchSmart "$template" "$newcfg"; then
+		ammLog::Error "Cannot fetch cfg template from '$template' to '$newcfg'"
+		return 1
+	fi
+
+	if ! ammLib::Load "fileformat.ini"; then
+		ammLog::Error "Cannot load library to confiure ini file '$newcfg'"
+		return 1
+	fi
+
+
+
+	# Update some values
+	typeset -A config=(
+		[repository.ROOT]="$DAT_BASE/repository"
+		# database
+		[database.PATH]="$DAT_BASE/sqlite.db"
+		# server
+	)
+
+	if ( set +u; [[ -z "${config[oauth2.JWT_SECRET]}" ]] ); then
+		config[oauth2.JWT_SECRET]="$(appRun::admin generate secret JWT_SECRET)"
+	fi
+
+	typeset -i r=0
+	typeset param
+	for param in "${!config[@]}"; do
+		typeset value="${config[$param]}"
+		typeset section="${param%.*}"
+		[[ "$section" == "$param" ]] && section=""
+		param="${param##*.}"
+
+		if ! ammFileformatIni::SetValue "$newcfg" "$section" "$param" "$value" "true"; then
+			ammLog::Warning "Unable to set '[$section].$param=$value' in config '$newcfg'"
+			r+=1
+		fi
+	done
+
+	return $r
+}
+
+
+# #############################################################################
+# Call the main function to do the processing
+# #############################################################################
+
+ammApp::Main "$@"
